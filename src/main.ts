@@ -59,7 +59,7 @@ export default class FileExplorerPlusPlugin extends Plugin {
 
                         let paths = sortedChildren.map((el) => el.file);
 
-                        if (plugin.settings.hideFilters.active) {
+                        if (plugin.settings.actions.HIDE.enabled) {
                             const pathsToHide = plugin.getPathsToHide(paths);
 
                             const pathsToHideLookUp = pathsToHide.reduce(
@@ -84,7 +84,7 @@ export default class FileExplorerPlusPlugin extends Plugin {
                         // only get visible vChildren
                         paths = sortedChildren.map((el) => el.file);
 
-                        if (plugin.settings.pinFilters.active) {
+                        if (plugin.settings.actions.PIN.enabled) {
                             const pathsToPin = plugin.getPathsToPin(paths);
 
                             const pathsToPinLookUp = pathsToPin.reduce(
@@ -159,13 +159,13 @@ export default class FileExplorerPlusPlugin extends Plugin {
                 return false;
             }
 
-            const pathFilterActivated = this.settings.pinFilters.paths.some((filter) => checkPathFilter(filter, path));
+            const pathFilterActivated = this.settings.actions.PIN.paths.some((filter) => checkPathFilter(filter, path));
 
             if (pathFilterActivated) {
                 return true;
             }
 
-            const tagFilterActivated = this.settings.pinFilters.tags.some((filter) => checkTagFilter(filter, path));
+            const tagFilterActivated = this.settings.actions.PIN.filters.some((filter) => checkTagFilter(filter, path));
 
             if (tagFilterActivated) {
                 return true;
@@ -181,13 +181,13 @@ export default class FileExplorerPlusPlugin extends Plugin {
                 return false;
             }
 
-            const pathFilterActivated = this.settings.hideFilters.paths.some((filter) => checkPathFilter(filter, path));
+            const pathFilterActivated = this.settings.actions.HIDE.paths.some((filter) => checkPathFilter(filter, path));
 
             if (pathFilterActivated) {
                 return true;
             }
 
-            const tagFilterActivated = this.settings.hideFilters.tags.some((filter) => checkTagFilter(filter, path));
+            const tagFilterActivated = this.settings.actions.HIDE.filters.some((filter) => checkTagFilter(filter, path));
 
             if (tagFilterActivated) {
                 return true;

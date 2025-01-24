@@ -1,7 +1,7 @@
 import { TAbstractFile, TFile, TFolder, setIcon, PathVirtualElement, TagCache } from "obsidian";
 import wcmatch from "wildcard-match";
 
-import { PathFilter, TagFilter } from "./settings";
+import { Filter, PathFilter, PropertyFilter, TagFilter } from "./settings";
 
 export function changeVirtualElementPin(vEl: PathVirtualElement, pin: boolean): PathVirtualElement {
     if (pin && !vEl.el.hasClass("tree-item-pinned")) {
@@ -21,6 +21,15 @@ export function changeVirtualElementPin(vEl: PathVirtualElement, pin: boolean): 
     }
 
     return vEl;
+}
+
+export function checkFilter(filter: Filter, file: TAbstractFile): boolean {
+	switch (filter.kind) {
+		case "PATH":
+			return checkPathFilter(filter, file);
+		case "TAG":
+			return checkTagFilter(filter, file);
+	}
 }
 
 export function checkPathFilter(filter: PathFilter, file: TAbstractFile): boolean {
@@ -112,4 +121,9 @@ export function checkTagFilter(filter: TagFilter, file: TAbstractFile): boolean 
     }
 
     return false;
+}
+
+export function checkPropertyFilter(filter: PropertyFilter, file: TAbstractFile): boolean {
+	// ...
+	return false;
 }

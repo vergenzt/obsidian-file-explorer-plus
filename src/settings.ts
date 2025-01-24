@@ -5,7 +5,10 @@ import { PathSuggest } from "./ui/suggest";
 import FileExplorerPlusPlugin from "./main";
 import { PathsActivatedModal } from "./ui/modals";
 
+export type FilterAction = "HIDE" | "PIN";
+
 export interface TagFilter {
+	kind: "TAG";
     name: string;
     active: boolean;
     pattern: string;
@@ -13,6 +16,7 @@ export interface TagFilter {
 }
 
 export interface PathFilter {
+	kind: "PATH";
     name: string;
     active: boolean;
     type: "FILES" | "DIRECTORIES" | "FILES_AND_DIRECTORIES";
@@ -20,71 +24,57 @@ export interface PathFilter {
     patternType: "REGEX" | "WILDCARD" | "STRICT";
 }
 
-export interface FileExplorerPlusPluginSettings {
-    hideStrictPathFilters: boolean;
-    pinFilters: {
-        active: boolean;
-        tags: TagFilter[];
-        paths: PathFilter[];
-    };
-
-    hideFilters: {
-        active: boolean;
-        tags: TagFilter[];
-        paths: PathFilter[];
-    };
-}
-
-export interface Filter {
+export interface PropertyFilter {
+	kind: "PROPERTY";
     name: string;
     active: boolean;
-    pattern: string;
-    patternType: "REGEX" | "WILDCARD" | "STRICT";
+    propertyNamePattern: string;
+    propertyNamePatternType: "REGEX" | "WILDCARD" | "STRICT";
+    propertyValuePattern: string;
+    propertyValuePatternType: "REGEX" | "WILDCARD" | "STRICT";
 }
+
+export interface FileExplorerPlusPluginSettings {
+    hideStrictPathFilters: boolean;
+	actions: Record<FilterAction, {
+		enabled: boolean;
+		filters: Filter[];
+	}>;
+}
+
+const DEFAULT_FILTERS: Filter[] = [
+	{
+		kind: "TAG",
+		name: "",
+		active: true,
+		pattern: "",
+		patternType: "STRICT",
+	},
+	{
+		kind: "PATH",
+		name: "",
+		active: true,
+		type: "FILES_AND_DIRECTORIES",
+		pattern: "",
+		patternType: "WILDCARD",
+	}
+];
 
 export const UNSEEN_FILES_DEFAULT_SETTINGS: FileExplorerPlusPluginSettings = {
     hideStrictPathFilters: true,
-    pinFilters: {
-        active: true,
-        tags: [
-            {
-                name: "",
-                active: true,
-                pattern: "",
-                patternType: "STRICT",
-            },
-        ],
-        paths: [
-            {
-                name: "",
-                active: true,
-                type: "FILES_AND_DIRECTORIES",
-                pattern: "",
-                patternType: "WILDCARD",
-            },
-        ],
-    },
-    hideFilters: {
-        active: true,
-        tags: [
-            {
-                name: "",
-                active: true,
-                pattern: "",
-                patternType: "STRICT",
-            },
-        ],
-        paths: [
-            {
-                name: "",
-                active: true,
-                type: "FILES_AND_DIRECTORIES",
-                pattern: "",
-                patternType: "WILDCARD",
-            },
-        ],
-    },
+    actions: {
+		PIN: {
+			enabled: true,
+			filters: JSON.parse(JSON.stringify(DEFAULT_FILTERS)),
+		},
+		HIDE: {
+			enabled: true,
+			filters: JSON.parse(JSON.stringify(DEFAULT_FILTERS)),
+		},
+	},
 };
+
+export type Filter = TagFilter | PathFilter;
 
 export default class FileExplorerPlusSettingTab extends PluginSettingTab {
     constructor(
@@ -125,9 +115,9 @@ export default class FileExplorerPlusSettingTab extends PluginSettingTab {
             .addToggle((toggle) => {
                 toggle
                     .setTooltip("Active")
-                    .setValue(this.plugin.settings.pinFilters.active)
+                    .setValue(this.plugin.settings.actions.PIN.enabled)
                     .onChange((isActive) => {
-                        this.plugin.settings.pinFilters.active = isActive;
+                        this.plugin.settings.actions.PIN.enabled = isActive;
 
                         this.plugin.saveSettings();
 
@@ -153,9 +143,9 @@ export default class FileExplorerPlusSettingTab extends PluginSettingTab {
             .addToggle((toggle) => {
                 toggle
                     .setTooltip("Active")
-                    .setValue(this.plugin.settings.hideFilters.active)
+                    .setValue(this.plugin.settings.actions.HIDE.enabled)
                     .onChange((isActive) => {
-                        this.plugin.settings.hideFilters.active = isActive;
+                        this.plugin.settings.actions.HIDE.enabled = isActive;
 
                         this.plugin.saveSettings();
 
@@ -176,15 +166,7 @@ export default class FileExplorerPlusSettingTab extends PluginSettingTab {
     }
 
     cleanSettings() {
-        this.plugin.settings.hideFilters.tags = this.plugin.settings.hideFilters.tags.filter((filter, index, arr) => {
-            if (index == arr.length - 1) {
-                return true;
-            }
-
-            return filter.pattern !== "" && arr.findIndex((x) => x.pattern === filter.pattern) === index;
-        });
-
-        this.plugin.settings.hideFilters.paths = this.plugin.settings.hideFilters.paths.filter((filter, index, arr) => {
+        this.plugin.settings.actions.HIDE.filters = this.plugin.settings.actions.HIDE.filters.filter((filter, index, arr) => {
             if (index == arr.length - 1) {
                 return true;
             }
@@ -196,13 +178,13 @@ export default class FileExplorerPlusSettingTab extends PluginSettingTab {
     pinTagFiltersSettings() {
         this.containerEl.createEl("h2", { text: "Tag filters" });
 
-        this.plugin.settings.pinFilters.tags.forEach((filter, index) => {
+        this.plugin.settings.actions.PIN.filters.filter(f => f.kind == "TAG").forEach((filter, index) => {
             new Setting(this.containerEl)
                 .addText((text) => {
                     text.setPlaceholder("Name (optional)")
                         .setValue(filter.name)
                         .onChange((newName) => {
-                            this.plugin.settings.pinFilters.tags[index].name = newName;
+                            this.plugin.settings.actions.PIN.tags[index].name = newName;
 
                             this.plugin.saveSettings();
                         });
@@ -211,7 +193,7 @@ export default class FileExplorerPlusSettingTab extends PluginSettingTab {
                     text.setPlaceholder("Tag pattern (required)")
                         .setValue(filter.pattern)
                         .onChange((newPattern) => {
-                            this.plugin.settings.pinFilters.tags[index].pattern = newPattern;
+                            this.plugin.settings.actions.PIN.tags[index].pattern = newPattern;
 
                             this.plugin.saveSettings();
                             this.plugin.getFileExplorer()?.requestSort();
@@ -226,7 +208,7 @@ export default class FileExplorerPlusSettingTab extends PluginSettingTab {
                         })
                         .setValue(filter.patternType)
                         .onChange((newPatternType) => {
-                            this.plugin.settings.pinFilters.tags[index].patternType = newPatternType as Filter["patternType"];
+                            this.plugin.settings.actions.PIN.tags[index].patternType = newPatternType as Filter["patternType"];
 
                             this.plugin.saveSettings();
                             this.plugin.getFileExplorer()?.requestSort();
@@ -237,7 +219,7 @@ export default class FileExplorerPlusSettingTab extends PluginSettingTab {
                         .setTooltip("Active")
                         .setValue(filter.active)
                         .onChange((isActive) => {
-                            this.plugin.settings.pinFilters.tags[index].active = isActive;
+                            this.plugin.settings.actions.PIN.tags[index].active = isActive;
 
                             this.plugin.saveSettings();
                             this.plugin.getFileExplorer()?.requestSort();
@@ -256,7 +238,7 @@ export default class FileExplorerPlusSettingTab extends PluginSettingTab {
                         .setIcon("cross")
                         .setTooltip("Delete")
                         .onClick(() => {
-                            this.plugin.settings.pinFilters.tags.splice(index, 1);
+                            this.plugin.settings.actions.PIN.tags.splice(index, 1);
 
                             this.plugin.saveSettings();
                             this.display();
@@ -270,7 +252,8 @@ export default class FileExplorerPlusSettingTab extends PluginSettingTab {
                 .setButtonText("Add new pin filter for tags")
                 .setCta()
                 .onClick(() => {
-                    this.plugin.settings.pinFilters.tags.push({
+                    this.plugin.settings.actions.PIN.tags.push({
+						kind: "TAG",
                         name: "",
                         active: true,
                         pattern: "",
@@ -285,7 +268,7 @@ export default class FileExplorerPlusSettingTab extends PluginSettingTab {
     pinPathFiltersSettings() {
         this.containerEl.createEl("h2", { text: "Path filters" });
 
-        this.plugin.settings.pinFilters.paths.forEach((filter, index) => {
+        this.plugin.settings.actions.PIN.paths.forEach((filter, index) => {
             if (this.plugin.settings.hideStrictPathFilters && filter.patternType === "STRICT") {
                 return;
             }
@@ -295,7 +278,7 @@ export default class FileExplorerPlusSettingTab extends PluginSettingTab {
                     text.setPlaceholder("Name (optional)")
                         .setValue(filter.name)
                         .onChange((newName) => {
-                            this.plugin.settings.pinFilters.paths[index].name = newName;
+                            this.plugin.settings.actions.PIN.paths[index].name = newName;
 
                             this.plugin.saveSettings();
                         });
@@ -306,7 +289,7 @@ export default class FileExplorerPlusSettingTab extends PluginSettingTab {
                     text.setPlaceholder("Path pattern (required)")
                         .setValue(filter.pattern)
                         .onChange((newPattern) => {
-                            this.plugin.settings.pinFilters.paths[index].pattern = newPattern;
+                            this.plugin.settings.actions.PIN.paths[index].pattern = newPattern;
 
                             this.plugin.saveSettings();
                             this.plugin.getFileExplorer()?.requestSort();
@@ -321,7 +304,7 @@ export default class FileExplorerPlusSettingTab extends PluginSettingTab {
                         })
                         .setValue(filter.type)
                         .onChange((newType) => {
-                            this.plugin.settings.pinFilters.paths[index].type = newType as PathFilter["type"];
+                            this.plugin.settings.actions.PIN.paths[index].type = newType as PathFilter["type"];
 
                             this.plugin.saveSettings();
                             this.plugin.getFileExplorer()?.requestSort();
@@ -336,7 +319,7 @@ export default class FileExplorerPlusSettingTab extends PluginSettingTab {
                         })
                         .setValue(filter.patternType)
                         .onChange((newPatternType) => {
-                            this.plugin.settings.pinFilters.paths[index].patternType = newPatternType as Filter["patternType"];
+                            this.plugin.settings.actions.PIN.paths[index].patternType = newPatternType as Filter["patternType"];
 
                             this.plugin.saveSettings();
                             this.plugin.getFileExplorer()?.requestSort();
@@ -347,7 +330,7 @@ export default class FileExplorerPlusSettingTab extends PluginSettingTab {
                         .setTooltip("Active")
                         .setValue(filter.active)
                         .onChange((isActive) => {
-                            this.plugin.settings.pinFilters.paths[index].active = isActive;
+                            this.plugin.settings.actions.PIN.paths[index].active = isActive;
 
                             this.plugin.saveSettings();
                             this.plugin.getFileExplorer()?.requestSort();
@@ -366,7 +349,7 @@ export default class FileExplorerPlusSettingTab extends PluginSettingTab {
                         .setIcon("cross")
                         .setTooltip("Delete")
                         .onClick(() => {
-                            this.plugin.settings.pinFilters.paths.splice(index, 1);
+                            this.plugin.settings.actions.PIN.paths.splice(index, 1);
 
                             this.plugin.saveSettings();
                             this.display();
@@ -380,7 +363,8 @@ export default class FileExplorerPlusSettingTab extends PluginSettingTab {
                 .setButtonText("Add new pin filter for paths")
                 .setCta()
                 .onClick(() => {
-                    this.plugin.settings.pinFilters.paths.push({
+                    this.plugin.settings.actions.PIN.paths.push({
+						kind: "PATH",
                         name: "",
                         active: true,
                         type: "FILES_AND_DIRECTORIES",
@@ -395,13 +379,13 @@ export default class FileExplorerPlusSettingTab extends PluginSettingTab {
     hideTagFiltersSettings() {
         this.containerEl.createEl("h2", { text: "Tag filters" });
 
-        this.plugin.settings.hideFilters.tags.forEach((filter, index) => {
+        this.plugin.settings.actions.HIDE.tags.forEach((filter, index) => {
             new Setting(this.containerEl)
                 .addText((text) => {
                     text.setPlaceholder("Name (optional)")
                         .setValue(filter.name)
                         .onChange((newName) => {
-                            this.plugin.settings.hideFilters.tags[index].name = newName;
+                            this.plugin.settings.actions.HIDE.tags[index].name = newName;
 
                             this.plugin.saveSettings();
                         });
@@ -410,7 +394,7 @@ export default class FileExplorerPlusSettingTab extends PluginSettingTab {
                     text.setPlaceholder("Tag pattern (required)")
                         .setValue(filter.pattern)
                         .onChange((newPattern) => {
-                            this.plugin.settings.hideFilters.tags[index].pattern = newPattern;
+                            this.plugin.settings.actions.HIDE.tags[index].pattern = newPattern;
 
                             this.plugin.saveSettings();
                             this.plugin.getFileExplorer()?.requestSort();
@@ -425,7 +409,7 @@ export default class FileExplorerPlusSettingTab extends PluginSettingTab {
                         })
                         .setValue(filter.patternType)
                         .onChange((newPatternType) => {
-                            this.plugin.settings.hideFilters.tags[index].patternType = newPatternType as Filter["patternType"];
+                            this.plugin.settings.actions.HIDE.tags[index].patternType = newPatternType as Filter["patternType"];
 
                             this.plugin.saveSettings();
                             this.plugin.getFileExplorer()?.requestSort();
@@ -436,7 +420,7 @@ export default class FileExplorerPlusSettingTab extends PluginSettingTab {
                         .setTooltip("Active")
                         .setValue(filter.active)
                         .onChange((isActive) => {
-                            this.plugin.settings.hideFilters.tags[index].active = isActive;
+                            this.plugin.settings.actions.HIDE.tags[index].active = isActive;
 
                             this.plugin.saveSettings();
                             this.plugin.getFileExplorer()?.requestSort();
@@ -455,7 +439,7 @@ export default class FileExplorerPlusSettingTab extends PluginSettingTab {
                         .setIcon("cross")
                         .setTooltip("Delete")
                         .onClick(() => {
-                            this.plugin.settings.hideFilters.tags.splice(index, 1);
+                            this.plugin.settings.actions.HIDE.tags.splice(index, 1);
 
                             this.plugin.saveSettings();
                             this.display();
@@ -469,7 +453,8 @@ export default class FileExplorerPlusSettingTab extends PluginSettingTab {
                 .setButtonText("Add new hide filter for tags")
                 .setCta()
                 .onClick(() => {
-                    this.plugin.settings.hideFilters.tags.push({
+                    this.plugin.settings.actions.HIDE.tags.push({
+						kind: "TAG",
                         name: "",
                         active: true,
                         pattern: "",
@@ -484,7 +469,7 @@ export default class FileExplorerPlusSettingTab extends PluginSettingTab {
     hidePathFiltersSettings() {
         this.containerEl.createEl("h2", { text: "Path filters" });
 
-        this.plugin.settings.hideFilters.paths.forEach((filter, index) => {
+        this.plugin.settings.actions.HIDE.paths.forEach((filter, index) => {
             if (this.plugin.settings.hideStrictPathFilters && filter.patternType === "STRICT") {
                 return;
             }
@@ -494,7 +479,7 @@ export default class FileExplorerPlusSettingTab extends PluginSettingTab {
                     text.setPlaceholder("Name (optional)")
                         .setValue(filter.name)
                         .onChange((newName) => {
-                            this.plugin.settings.hideFilters.paths[index].name = newName;
+                            this.plugin.settings.actions.HIDE.paths[index].name = newName;
 
                             this.plugin.saveSettings();
                         });
@@ -505,7 +490,7 @@ export default class FileExplorerPlusSettingTab extends PluginSettingTab {
                     text.setPlaceholder("Path pattern (required)")
                         .setValue(filter.pattern)
                         .onChange((newPattern) => {
-                            this.plugin.settings.hideFilters.paths[index].pattern = newPattern;
+                            this.plugin.settings.actions.HIDE.paths[index].pattern = newPattern;
 
                             this.plugin.saveSettings();
                             this.plugin.getFileExplorer()?.requestSort();
@@ -520,7 +505,7 @@ export default class FileExplorerPlusSettingTab extends PluginSettingTab {
                         })
                         .setValue(filter.type)
                         .onChange((newType) => {
-                            this.plugin.settings.hideFilters.paths[index].type = newType as PathFilter["type"];
+                            this.plugin.settings.actions.HIDE.paths[index].type = newType as PathFilter["type"];
 
                             this.plugin.saveSettings();
                             this.plugin.getFileExplorer()?.requestSort();
@@ -535,7 +520,7 @@ export default class FileExplorerPlusSettingTab extends PluginSettingTab {
                         })
                         .setValue(filter.patternType)
                         .onChange((newPatternType) => {
-                            this.plugin.settings.hideFilters.paths[index].patternType = newPatternType as Filter["patternType"];
+                            this.plugin.settings.actions.HIDE.paths[index].patternType = newPatternType as Filter["patternType"];
 
                             this.plugin.saveSettings();
                             this.plugin.getFileExplorer()?.requestSort();
@@ -546,7 +531,7 @@ export default class FileExplorerPlusSettingTab extends PluginSettingTab {
                         .setTooltip("Active")
                         .setValue(filter.active)
                         .onChange((isActive) => {
-                            this.plugin.settings.hideFilters.paths[index].active = isActive;
+                            this.plugin.settings.actions.HIDE.paths[index].active = isActive;
 
                             this.plugin.saveSettings();
                             this.plugin.getFileExplorer()?.requestSort();
@@ -565,7 +550,7 @@ export default class FileExplorerPlusSettingTab extends PluginSettingTab {
                         .setIcon("cross")
                         .setTooltip("Delete")
                         .onClick(() => {
-                            this.plugin.settings.hideFilters.paths.splice(index, 1);
+                            this.plugin.settings.actions.HIDE.paths.splice(index, 1);
 
                             this.plugin.saveSettings();
                             this.display();
@@ -579,7 +564,8 @@ export default class FileExplorerPlusSettingTab extends PluginSettingTab {
                 .setButtonText("Add new hide filter for paths")
                 .setCta()
                 .onClick(() => {
-                    this.plugin.settings.hideFilters.paths.push({
+                    this.plugin.settings.actions.HIDE.paths.push({
+						kind: "PATH",
                         name: "",
                         active: true,
                         type: "FILES_AND_DIRECTORIES",

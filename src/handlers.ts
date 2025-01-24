@@ -25,7 +25,7 @@ export function addCommands(plugin: FileExplorerPlusPlugin) {
         id: "toggle-global-pin-filters",
         name: "Toggle all pin filters",
         callback: () => {
-            plugin.settings.pinFilters.active = !plugin.settings.pinFilters.active;
+            plugin.settings.actions.PIN.enabled = !plugin.settings.actions.PIN.enabled;
 
             plugin.saveSettings();
             plugin.getFileExplorer()?.requestSort();
@@ -36,7 +36,7 @@ export function addCommands(plugin: FileExplorerPlusPlugin) {
         id: "toggle-global-hide-filters",
         name: "Toggle all hide filters",
         callback: () => {
-            plugin.settings.hideFilters.active = !plugin.settings.hideFilters.active;
+            plugin.settings.actions.HIDE.enabled = !plugin.settings.actions.HIDE.enabled;
 
             plugin.saveSettings();
             plugin.getFileExplorer()?.requestSort();
@@ -50,8 +50,8 @@ export function addOnTagChange(plugin: FileExplorerPlusPlugin) {
             const isPinned = plugin.getFileExplorer()!.fileItems[path.path].info.pinned;
             const isHidden = plugin.getFileExplorer()!.fileItems[path.path].info.hidden;
 
-            const shouldBePinned = plugin.settings.pinFilters.tags.some((filter) => checkTagFilter(filter, path));
-            const shouldBeHidden = plugin.settings.hideFilters.tags.some((filter) => checkTagFilter(filter, path));
+            const shouldBePinned = plugin.settings.actions.PIN.filters.some((filter) => checkTagFilter(filter, path));
+            const shouldBeHidden = plugin.settings.actions.HIDE.filters.some((filter) => checkTagFilter(filter, path));
 
             if (isPinned !== shouldBePinned && !shouldBeHidden) {
                 plugin.getFileExplorer()?.requestSort();
@@ -69,7 +69,7 @@ export function addOnTagChange(plugin: FileExplorerPlusPlugin) {
 export function addOnRename(plugin: FileExplorerPlusPlugin) {
     plugin.registerEvent(
         plugin.app.vault.on("rename", (path, oldPath) => {
-            const hideFilterPreviousIndex = plugin.settings.hideFilters.paths.findIndex((pathFilter) => {
+            const hideFilterPreviousIndex = plugin.settings.actions.HIDE.paths.findIndex((pathFilter) => {
                 if (pathFilter.patternType === "STRICT" && pathFilter.pattern === oldPath) {
                     return true;
                 }
@@ -78,10 +78,10 @@ export function addOnRename(plugin: FileExplorerPlusPlugin) {
             });
 
             if (hideFilterPreviousIndex !== -1) {
-                plugin.settings.hideFilters.paths[hideFilterPreviousIndex].pattern = path.path;
+                plugin.settings.actions.HIDE.paths[hideFilterPreviousIndex].pattern = path.path;
             }
 
-            const pinFilterPreviousIndex = plugin.settings.pinFilters.paths.findIndex((pathFilter) => {
+            const pinFilterPreviousIndex = plugin.settings.actions.PIN.paths.findIndex((pathFilter) => {
                 if (pathFilter.patternType === "STRICT" && pathFilter.pattern === oldPath) {
                     return true;
                 }
@@ -90,7 +90,7 @@ export function addOnRename(plugin: FileExplorerPlusPlugin) {
             });
 
             if (pinFilterPreviousIndex !== -1) {
-                plugin.settings.pinFilters.paths[pinFilterPreviousIndex].pattern = path.path;
+                plugin.settings.actions.PIN.paths[pinFilterPreviousIndex].pattern = path.path;
             }
         }),
     );
@@ -99,7 +99,7 @@ export function addOnRename(plugin: FileExplorerPlusPlugin) {
 export function addOnDelete(plugin: FileExplorerPlusPlugin) {
     plugin.registerEvent(
         plugin.app.vault.on("delete", (path) => {
-            const hideFilterPreviousIndex = plugin.settings.hideFilters.paths.findIndex((pathFilter) => {
+            const hideFilterPreviousIndex = plugin.settings.actions.HIDE.paths.findIndex((pathFilter) => {
                 if (pathFilter.patternType === "STRICT" && pathFilter.pattern === path.path) {
                     return true;
                 }
@@ -108,10 +108,10 @@ export function addOnDelete(plugin: FileExplorerPlusPlugin) {
             });
 
             if (hideFilterPreviousIndex !== -1) {
-                plugin.settings.hideFilters.paths.splice(hideFilterPreviousIndex, 1);
+                plugin.settings.actions.HIDE.paths.splice(hideFilterPreviousIndex, 1);
             }
 
-            const pinFilterPreviousIndex = plugin.settings.pinFilters.paths.findIndex((pathFilter) => {
+            const pinFilterPreviousIndex = plugin.settings.actions.PIN.paths.findIndex((pathFilter) => {
                 if (pathFilter.patternType === "STRICT" && pathFilter.pattern === path.path) {
                     return true;
                 }
@@ -120,7 +120,7 @@ export function addOnDelete(plugin: FileExplorerPlusPlugin) {
             });
 
             if (pinFilterPreviousIndex !== -1) {
-                plugin.settings.pinFilters.paths.splice(pinFilterPreviousIndex, 1);
+                plugin.settings.actions.PIN.paths.splice(pinFilterPreviousIndex, 1);
             }
         }),
     );
@@ -132,16 +132,16 @@ export function addCommandsToFileMenu(plugin: FileExplorerPlusPlugin) {
             if (path instanceof TFile) {
                 menu.addSeparator()
                     .addItem((item) => {
-                        const index = plugin.settings.pinFilters.paths.findIndex(
+                        const index = plugin.settings.actions.PIN.paths.findIndex(
                             (filter) => filter.patternType === "STRICT" && filter.type === "FILES" && filter.pattern === path.path,
                         );
 
-                        if (index === -1 || !plugin.settings.pinFilters.paths[index].active) {
+                        if (index === -1 || !plugin.settings.actions.PIN.paths[index].active) {
                             item.setTitle("Pin File")
                                 .setIcon("pin")
                                 .onClick(() => {
                                     if (index === -1) {
-                                        plugin.settings.pinFilters.paths.push({
+                                        plugin.settings.actions.PIN.paths.push({
                                             name: "",
                                             active: true,
                                             type: "FILES",
@@ -149,11 +149,11 @@ export function addCommandsToFileMenu(plugin: FileExplorerPlusPlugin) {
                                             patternType: "STRICT",
                                         });
                                     } else {
-                                        plugin.settings.pinFilters.paths[index].active = true;
+                                        plugin.settings.actions.PIN.paths[index].active = true;
                                     }
 
                                     plugin.saveSettings();
-                                    if (plugin.settings.pinFilters.active) {
+                                    if (plugin.settings.actions.PIN.enabled) {
                                         plugin.getFileExplorer()?.requestSort();
                                     }
                                 });
@@ -161,7 +161,7 @@ export function addCommandsToFileMenu(plugin: FileExplorerPlusPlugin) {
                             item.setTitle("Unpin File")
                                 .setIcon("pin-off")
                                 .onClick(() => {
-                                    plugin.settings.pinFilters.paths.splice(index, 1);
+                                    plugin.settings.actions.PIN.paths.splice(index, 1);
 
                                     plugin.saveSettings();
                                     plugin.getFileExplorer()?.requestSort();
@@ -169,16 +169,16 @@ export function addCommandsToFileMenu(plugin: FileExplorerPlusPlugin) {
                         }
                     })
                     .addItem((item) => {
-                        const index = plugin.settings.hideFilters.paths.findIndex(
+                        const index = plugin.settings.actions.HIDE.paths.findIndex(
                             (filter) => filter.patternType === "STRICT" && filter.type === "FILES" && filter.pattern === path.path,
                         );
 
-                        if (index === -1 || !plugin.settings.hideFilters.paths[index].active) {
+                        if (index === -1 || !plugin.settings.actions.HIDE.paths[index].active) {
                             item.setTitle("Hide File")
                                 .setIcon("eye-off")
                                 .onClick(() => {
                                     if (index === -1) {
-                                        plugin.settings.hideFilters.paths.push({
+                                        plugin.settings.actions.HIDE.paths.push({
                                             name: "",
                                             active: true,
                                             type: "FILES",
@@ -186,11 +186,11 @@ export function addCommandsToFileMenu(plugin: FileExplorerPlusPlugin) {
                                             patternType: "STRICT",
                                         });
                                     } else {
-                                        plugin.settings.hideFilters.paths[index].active = true;
+                                        plugin.settings.actions.HIDE.paths[index].active = true;
                                     }
 
                                     plugin.saveSettings();
-                                    if (plugin.settings.hideFilters.active) {
+                                    if (plugin.settings.actions.HIDE.enabled) {
                                         plugin.getFileExplorer()?.requestSort();
                                     }
                                 });
@@ -198,7 +198,7 @@ export function addCommandsToFileMenu(plugin: FileExplorerPlusPlugin) {
                             item.setTitle("Unhide File")
                                 .setIcon("eye")
                                 .onClick(() => {
-                                    plugin.settings.hideFilters.paths.splice(index, 1);
+                                    plugin.settings.actions.HIDE.paths.splice(index, 1);
 
                                     plugin.saveSettings();
                                     plugin.getFileExplorer()?.requestSort();
@@ -208,16 +208,16 @@ export function addCommandsToFileMenu(plugin: FileExplorerPlusPlugin) {
             } else {
                 menu.addSeparator()
                     .addItem((item) => {
-                        const index = plugin.settings.pinFilters.paths.findIndex(
+                        const index = plugin.settings.actions.PIN.paths.findIndex(
                             (filter) => filter.patternType === "STRICT" && filter.type === "DIRECTORIES" && filter.pattern === path.path,
                         );
 
-                        if (index === -1 || !plugin.settings.pinFilters.paths[index].active) {
+                        if (index === -1 || !plugin.settings.actions.PIN.paths[index].active) {
                             item.setTitle("Pin Folder")
                                 .setIcon("pin")
                                 .onClick(() => {
                                     if (index === -1) {
-                                        plugin.settings.pinFilters.paths.push({
+                                        plugin.settings.actions.PIN.paths.push({
                                             name: "",
                                             active: true,
                                             type: "DIRECTORIES",
@@ -225,11 +225,11 @@ export function addCommandsToFileMenu(plugin: FileExplorerPlusPlugin) {
                                             patternType: "STRICT",
                                         });
                                     } else {
-                                        plugin.settings.pinFilters.paths[index].active = true;
+                                        plugin.settings.actions.PIN.paths[index].active = true;
                                     }
 
                                     plugin.saveSettings();
-                                    if (plugin.settings.pinFilters.active) {
+                                    if (plugin.settings.actions.PIN.enabled) {
                                         plugin.getFileExplorer()?.requestSort();
                                     }
                                 });
@@ -237,7 +237,7 @@ export function addCommandsToFileMenu(plugin: FileExplorerPlusPlugin) {
                             item.setTitle("Unpin Folder")
                                 .setIcon("pin-off")
                                 .onClick(() => {
-                                    plugin.settings.pinFilters.paths.splice(index, 1);
+                                    plugin.settings.actions.PIN.paths.splice(index, 1);
 
                                     plugin.saveSettings();
                                     plugin.getFileExplorer()?.requestSort();
@@ -245,16 +245,16 @@ export function addCommandsToFileMenu(plugin: FileExplorerPlusPlugin) {
                         }
                     })
                     .addItem((item) => {
-                        const index = plugin.settings.hideFilters.paths.findIndex(
+                        const index = plugin.settings.actions.HIDE.paths.findIndex(
                             (filter) => filter.patternType === "STRICT" && filter.type === "DIRECTORIES" && filter.pattern === path.path,
                         );
 
-                        if (index === -1 || !plugin.settings.hideFilters.paths[index].active) {
+                        if (index === -1 || !plugin.settings.actions.HIDE.paths[index].active) {
                             item.setTitle("Hide Folder")
                                 .setIcon("eye-off")
                                 .onClick(() => {
                                     if (index === -1) {
-                                        plugin.settings.hideFilters.paths.push({
+                                        plugin.settings.actions.HIDE.paths.push({
                                             name: "",
                                             active: true,
                                             type: "DIRECTORIES",
@@ -262,11 +262,11 @@ export function addCommandsToFileMenu(plugin: FileExplorerPlusPlugin) {
                                             patternType: "STRICT",
                                         });
                                     } else {
-                                        plugin.settings.hideFilters.paths[index].active = true;
+                                        plugin.settings.actions.HIDE.paths[index].active = true;
                                     }
 
                                     plugin.saveSettings();
-                                    if (plugin.settings.hideFilters.active) {
+                                    if (plugin.settings.actions.HIDE.enabled) {
                                         plugin.getFileExplorer()?.requestSort();
                                     }
                                 });
@@ -274,7 +274,7 @@ export function addCommandsToFileMenu(plugin: FileExplorerPlusPlugin) {
                             item.setTitle("Unhide Folder")
                                 .setIcon("eye")
                                 .onClick(() => {
-                                    plugin.settings.hideFilters.paths.splice(index, 1);
+                                    plugin.settings.actions.HIDE.paths.splice(index, 1);
 
                                     plugin.saveSettings();
                                     plugin.getFileExplorer()?.requestSort();

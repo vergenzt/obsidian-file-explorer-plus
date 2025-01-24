@@ -1,28 +1,23 @@
 import { FuzzySuggestModal, Modal, TFile, TFolder } from "obsidian";
 
 import FileExplorerPlusPlugin from "src/main";
-import { Filter, TagFilter, PathFilter } from "src/settings";
-import { checkPathFilter, checkTagFilter } from "src/utils";
+import { Filter, FilterAction, TagFilter, PathFilter } from "src/settings";
+import { checkFilter } from "src/utils";
 
 export class InputFilterNameModal extends FuzzySuggestModal<Filter> {
     constructor(
         private plugin: FileExplorerPlusPlugin,
-        private actionType: "PIN" | "HIDE",
+        private actionType: FilterAction,
     ) {
         super(plugin.app);
         this.setPlaceholder("Type name of a filter...");
     }
 
     getItems(): Filter[] {
-        let filters: any[] = [];
-
-        if (this.actionType === "PIN") {
-            filters = filters.concat(this.plugin.settings?.pinFilters.tags || []);
-            filters = filters.concat(this.plugin.settings?.pinFilters.paths || []);
-        } else if (this.actionType === "HIDE") {
-            filters = filters.concat(this.plugin.settings?.hideFilters.tags || []);
-            filters = filters.concat(this.plugin.settings?.hideFilters.paths || []);
-        }
+        let filters: Filter[] = [
+			...(this.plugin.settings?.actions[this.actionType].tags || []),
+			...(this.plugin.settings?.actions[this.actionType].paths || []),
+		]
 
         filters = filters.filter((x) => x.name !== "");
 
@@ -36,37 +31,20 @@ export class InputFilterNameModal extends FuzzySuggestModal<Filter> {
     }
 
     onChooseItem(chosenFilter: Filter): void {
-        if (this.actionType === "PIN") {
-            this.plugin.settings.pinFilters.tags = this.plugin.settings.pinFilters.tags.map((filter) => {
-                if (filter.name === chosenFilter.name) {
-                    filter.active = !filter.active;
-                }
+		this.plugin.settings.actions[this.actionType].tags = this.plugin.settings.actions[this.actionType].tags.map((filter) => {
+			if (filter.name === chosenFilter.name) {
+				filter.active = !filter.active;
+			}
 
-                return filter;
-            });
-            this.plugin.settings.pinFilters.paths = this.plugin.settings.pinFilters.paths.map((filter) => {
-                if (filter.name === chosenFilter.name) {
-                    filter.active = !filter.active;
-                }
-
-                return filter;
-            });
-        } else if (this.actionType === "HIDE") {
-            this.plugin.settings.hideFilters.tags = this.plugin.settings.hideFilters.tags.map((filter) => {
-                if (filter.name === chosenFilter.name) {
-                    filter.active = !filter.active;
-                }
-
-                return filter;
-            });
-            this.plugin.settings.hideFilters.paths = this.plugin.settings.hideFilters.paths.map((filter) => {
-                if (filter.name === chosenFilter.name) {
-                    filter.active = !filter.active;
-                }
-
-                return filter;
-            });
-        }
+			return filter;
+		});
+		this.plugin.settings.actions[this.actionType].paths = this.plugin.settings.actions[this.actionType].paths.map((filter) => {
+			if (filter.name === chosenFilter.name) {
+				filter.active = !filter.active;
+			}
+			
+			return filter;
+		});
 
         this.plugin.getFileExplorer()?.requestSort();
     }
@@ -77,7 +55,6 @@ export class PathsActivatedModal extends Modal {
         private plugin: FileExplorerPlusPlugin,
         private actionType: "PIN" | "HIDE",
         private specificFilter?: Filter,
-        private filterType?: "PATH" | "TAG",
     ) {
         super(plugin.app);
     }
@@ -91,23 +68,15 @@ export class PathsActivatedModal extends Modal {
         let tagFilters: TagFilter[];
 
         if (this.actionType === "HIDE") {
-            pathFilters = this.plugin.settings.hideFilters.paths;
-            tagFilters = this.plugin.settings.hideFilters.tags;
+            pathFilters = this.plugin.settings.actions.HIDE.paths;
+            tagFilters = this.plugin.settings.actions.HIDE.filters;
         } else if (this.actionType === "PIN") {
-            pathFilters = this.plugin.settings.pinFilters.paths;
-            tagFilters = this.plugin.settings.pinFilters.tags;
+            pathFilters = this.plugin.settings.actions[this.actionType].paths;
+            tagFilters = this.plugin.settings.actions[this.actionType].tags;
         }
 
         if (this.specificFilter) {
-            pathsActivated = files.filter((file) => {
-                if (this.filterType === "PATH") {
-                    return checkPathFilter(this.specificFilter as PathFilter, file);
-                } else if (this.filterType === "TAG") {
-                    return checkTagFilter(this.specificFilter as TagFilter, file);
-                }
-
-                return false;
-            });
+            pathsActivated = files.filter((file) => checkFilter(this.specificFilter, file));
         } else {
             pathsActivated = this.actionType === "HIDE" ? this.plugin.getPathsToHide(files) : this.plugin.getPathsToPin(files);
         }
